@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Support\Https;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -37,7 +38,7 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('agenda.index'));
+        return redirect()->to(Https::url((string) $request->session()->pull('url.intended', route('agenda.index'))));
     }
 
     public function destroy(Request $request)

@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('agenda.index'));
+        $middleware->trustProxies(at: '*');
 
         // Establecer locale a español para todas las peticiones (web y API)
         $middleware->web(append: [

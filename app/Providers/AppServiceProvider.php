@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Events\AppointmentCancelled;
 use App\Listeners\SendCancellationNotifications;
+use App\Support\Https;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -15,10 +16,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        if (config('app.env') === 'production') {
-            URL::forceScheme('https');
-        }
-
         // WhatsApp Provider - Binding del puerto a la implementación según configuración
         $this->app->singleton(
             \App\Features\WhatsApp\Domain\Ports\WhatsAppSender::class,
@@ -61,6 +58,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (Https::required()) {
+            URL::forceScheme('https');
+        }
+
         // Establecer locale a español por defecto
         app()->setLocale('es');
 

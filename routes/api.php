@@ -62,7 +62,8 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('availability-blocks', \App\Http\Controllers\Api\V1\AvailabilityBlockController::class)->only(['index', 'store', 'destroy']);
 
-        Route::apiResource('services', \App\Http\Controllers\Api\V1\ServiceController::class);
+        Route::apiResource('services', \App\Http\Controllers\Api\V1\ServiceController::class)
+            ->names('api.services');
 
         Route::apiResource('users', \App\Http\Controllers\Api\V1\UserController::class);
 

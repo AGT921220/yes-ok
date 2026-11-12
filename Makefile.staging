@@ -1,0 +1,216 @@
+include .env
+
+ example:
+	@echo ${SERVER_PASS};
+up:
+	@docker compose down;\
+	docker-compose up -d
+up-dev:
+	@docker compose down;\
+	docker compose -f docker-compose-dev.yml up -d;
+down-dev:
+	@docker compose -f docker-compose-dev.yml down;
+install:
+	echo "Docker Exec";\
+	docker exec -it php-yes-ok-staging composer install
+seed:
+	@echo "🌱 Poblando base de datos con datos iniciales...";\
+	docker exec php-yes-ok-staging php artisan db:seed
+migrate-seed:
+	@echo "🔄 Ejecutando migraciones y poblando base de datos...";\
+	docker exec php-yes-ok-staging php artisan migrate --seed
+enter:
+	docker exec -it php-yes-ok-staging /bin/bash;
+nginx:
+	docker exec -it nginx-yes-ok-staging /bin/sh;	
+qa-code-metrics:
+	@php artisan qa;	
+test:
+	@./vendor/bin/phpunit --stop-on-error --stop-on-failure
+
+# restart-database-testing:
+# 	@php artisan migrate:rollback --env=testing;\
+# 	php artisan migrate --env=testing;\
+# 	php artisan initial_setup_test --env=testing;\
+# 	php artisan db:restore-config
+
+	@php vendor/bin/phpunit --stop-on-error --stop-on-failure --no-coverage;
+restart-database-testing:
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword -e "DROP DATABASE IF EXISTS testing; CREATE DATABASE testing;"
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword testing < testing_db.sql
+
+restart-database-github-action:
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword -e "DROP DATABASE IF EXISTS db; CREATE DATABASE db;"
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword db < testing_db.sql
+
+#Agregar migraciones a base de datos de Testing
+migrate-testing:
+	@php artisan migrate --env=testing
+
+#Exporta la base de datos de Testing
+create-testing-db:
+	@docker exec -i yes-ok-staging_mysql mysqldump -u user -ppassword db > storage/app/testing_db.sql
+
+# 	@if [ -f testing_db.sql ]; then \
+# 		mkdir -p storage/testing; \
+# 	fi
+# 	@docker exec -i yes-ok-staging_mysql mysqldump -u user -ppassword db > testing_db.sql
+db-export:
+	@docker exec -i yes-ok-staging_mysql mysqldump -u root -p'rootPremierPassword!2025.' database > storage/app/yes-ok-staging.sql
+
+restart-testing-db:
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword -e "CREATE DATABASE testing;"
+	
+
+clear:
+	@docker exec -it php-yes-ok-staging /bin/bash -c \
+"php artisan config:cache && php artisan config:clear && php artisan queue:restart && php artisan route:clear && php artisan route:cache && php artisan horizon:purge && php artisan cache:clear"
+
+deploy:
+	@docker exec -it php-yes-ok-staging /bin/bash -c "php artisan config:clear && php artisan config:cache"
+opcache:
+	@docker exec -it php-yes-ok-staging /bin/bash -c "php -r \"function_exists('opcache_reset') && opcache_reset(); echo '✅ OPcache reset\n';\""
+
+# Recarga graciosa de php-fpm (reinicia workers y limpia OPcache)
+fpm-reload:
+	@docker exec -it php-yes-ok-staging /bin/sh -lc 'kill -USR2 1 && echo "♻️ php-fpm reloaded (OPcache limpio)"'
+
+qa/full-report:
+	@mkdir -p build/phpmd && mkdir -p build/phpcs && mkdir -p build/coverage-report &&\
+	php -d pcov.enabled=1 -dpcov.directory=./app vendor/bin/phpunit --coverage-html=./build/coverage-report && \
+	vendor/bin/phpmd app html phpmd.xml --reportfile build/phpmd/phpmd.html --ignore-violations-on-exit && \
+	vendor/bin/phpcs --report=summary --report-file=./build/phpcs/phpcs_summary.txt --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 app && \
+	vendor/bin/phpcs --report=source --report-file=./build/phpcs/phpcs_source.txt --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 app && \
+	vendor/bin/phpcs --report=full --report-file=./build/phpcs/phpcs_full.txt --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 app;
+
+coverage:
+	@php -d memory_limit=512M -d xdebug.mode=coverage vendor/bin/phpunit --coverage-clover='build/coverage-report/coverage.xml' --coverage-html='build/coverage-report'
+	
+old/qa-full-report:
+# @mkdir -p build/phpmd && mkdir -p build/phpstan && mkdir -p build/phpcs && mkdir -p build/coverage-report &&\
+# vendor/bin/phpunit --coverage-clover ./build/phpunit-sonarqube/coverage.xml --log-junit ./build/phpunit-sonarqube/logfile.xml \
+# --coverage-html ./build/coverage-report && \
+# phpdismod -s cli xdebug && \
+# vendor/bin/phpmd app html phpmd.xml --reportfile build/phpmd/phpmd.html --ignore-violations-on-exit && \
+# vendor/bin/phpcs --report=summary --report-file=./build/phpcs/phpcs_summary.txt --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 app && \
+# vendor/bin/phpcs --report=source --report-file=./build/phpcs/phpcs_source.txt --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 app && \
+# vendor/bin/phpcs --report=full --report-file=./build/phpcs/phpcs_full.txt --runtime-set ignore_errors_on_exit 1 --runtime-set ignore_warnings_on_exit 1 app;
+
+server-enter:
+	@ssh root@${SERVER_IP}
+#	@sshpass -p test ssh root@e73c1b9.online-server.cloud
+
+staging/server-enter:
+	@ssh root@${STAGING_SERVER_IP}
+coverage-report:
+	@./vendor/bin/phpunit --coverage-html build/coverage-report
+check-namespaces:
+	@php artisan check_namespaces
+
+
+
+configure-testing-database:
+	@php artisan migrate --env="testing";
+utils/paste-master:
+	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+    git checkout master; \
+    git pull origin master; \
+    git checkout $$CURRENT_BRANCH; \
+    git merge master;
+
+install-xdebug:
+	@apk add --no-cache $PHPIZE_DEPS \
+    && pecl install xdebug-2.9.2 \
+    && docker-php-ext-enable xdebug 
+phpunit-config:
+	@alias phpunit='./vendor/bin/phpunit';
+ngrok:
+	@ngrok http --host-header=rewrite http://localhost;
+
+create-valid-path:
+	@mkdir -p storage/framework/cache \
+	mkdir -p storage/framework/views
+
+import-db:
+	@docker exec -i ${DB_HOST} mysql -u${DB_USERNAME} -p${DB_PASSWORD} \
+		-e "DROP DATABASE IF EXISTS \`${DB_DATABASE}\`; CREATE DATABASE \`${DB_DATABASE}\`;"
+	@docker exec -i ${DB_HOST} mysql -u${DB_USERNAME} -p${DB_PASSWORD} \
+		${DB_DATABASE} < storage/app/yes-ok-staging.sql
+
+testing/import-db:
+	@docker exec -i ${DB_HOST} mysql -u user -ppassword -e "DROP DATABASE IF EXISTS testing; CREATE DATABASE testing;"
+	@docker exec -i ${DB_HOST} mysql -u user -ppassword testing < storage/app/yes-ok-staging.sql
+
+restart-testing:
+	@docker exec -i yes-ok-staging_mysql bash -c "\
+		mysql -u root -p1234 -e 'DROP DATABASE IF EXISTS testing; CREATE DATABASE testing; GRANT ALL PRIVILEGES ON testing.* TO \"user\"@\"%\" IDENTIFIED BY \"password\" WITH GRANT OPTION; FLUSH PRIVILEGES;'"\
+
+refresh-database-performance:
+	# Ejecutar comandos en el contenedor MySQL
+	@docker exec -i yes-ok-staging_mysql bash -c "\
+		mysql -u root -p1234 -e 'DROP DATABASE IF EXISTS performance; CREATE DATABASE performance; GRANT ALL PRIVILEGES ON performance.* TO \"user\"@\"%\" IDENTIFIED BY \"password\" WITH GRANT OPTION; FLUSH PRIVILEGES;'"
+	
+	# Ejecutar comandos en el contenedor PHP
+	@docker exec -it php-yes-ok-staging bash -c "php artisan migrate --env=performance"
+	@docker exec -it php-yes-ok-staging bash -c "php artisan initial_setup_performance"
+
+restart-database-performance:
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword -e "DROP DATABASE IF EXISTS performance; CREATE DATABASE performance;"
+	@docker exec -i yes-ok-staging_mysql mysql -u user -ppassword performance < ./storage/app/performance.sql
+
+
+develop-server/copy-signs:
+	rsync -avz ~/Alfredo/Personal/Proyectos/yes-ok-stagingErp/public/images/usuarios/firma_digital/ root@74.208.83.112:/home/yes-ok-stagingErp/public/images/usuarios/firma_digital/
+
+update-bulk-passwords:
+	@echo "Actualizando contraseñas de usuarios..."
+	@docker exec php-yes-ok-staging php artisan update-bulk-passwords
+
+UNUSED_PHP_FILES=unused_php_files.txt
+
+check-unused-php:
+	@echo "Buscando archivos .php no utilizados en el sistema Laravel..."
+	@find app -type f -name "*.php" | sed 's|^\./||' > all_php_files.txt
+	@grep -hr --include=\*.php -E "namespace|class" app | awk '/namespace/ {ns=$2} /class/ {print ns"\\"$2}' | sed 's/;//g' | sort | uniq > php_classes.txt
+	@grep -r -E --include=\*.php "\\b($(awk '{printf "%s|", $0}' php_classes.txt | sed 's/|$//'))\\b" app \
+		| awk -F: '{print $1}' | sort | uniq > referenced_php_files.txt
+	# Filtra los archivos usados también por autoload y composiciones dinámicas
+	@find app -type f -name "*.php" -exec grep -l "use " {} + | sort | uniq >> referenced_php_files.txt
+	@sort all_php_files.txt > sorted_all_php_files.txt
+	@sort referenced_php_files.txt | uniq > sorted_referenced_php_files.txt
+	@comm -23 sorted_all_php_files.txt sorted_referenced_php_files.txt > $(UNUSED_PHP_FILES)
+	@echo "Análisis completo. Archivos no utilizados guardados en $(UNUSED_PHP_FILES)."
+	@rm -f all_php_files.txt referenced_php_files.txt php_classes.txt sorted_all_php_files.txt sorted_referenced_php_files.txt
+push-database-server:
+	@scp storage/app/yes-ok-staging.sql root@$(SERVER_IP):/home/yes-ok-stagingErp/storage/app/yes-ok-staging.sql
+push-signs-images-server:
+	@scp -r public/images/usuarios/firma_digital/ root@$(SERVER_IP):/home/yes-ok-stagingErp/public/images/usuarios/
+	
+staging/import-db:
+	@docker exec -i mysql-staging mysql -u user -p${DB_PASSWORD} -e "DROP DATABASE IF EXISTS \`yes-ok-staging\`; CREATE DATABASE \`yes-ok-staging\`;"
+	@docker exec -i mysql-staging mysql -u user -p${DB_PASSWORD} yes-ok-staging < storage/app/yes-ok-staging.sql
+
+check-opcache:
+	@echo "🧪 Creando archivo temporal para prueba FPM..."
+	@(docker compose exec -T php sh -lc 'printf "<?php echo \"mtime=\".filemtime(\"../routes/web.php\");" > /var/www/html/public/_checkop.php' \
+	 || docker exec -i php-yes-ok-staging sh -lc 'printf "<?php echo \"mtime=\".filemtime(\"../routes/web.php\");" > /var/www/html/public/_checkop.php')
+
+	@echo "🌐 Probando vía host → Nginx → FPM (http://localhost/_checkop.php)..."
+	@curl -fsS http://localhost/_checkop.php || echo "⚠️ No se pudo acceder vía host→Nginx→FPM"
+
+	@echo "\n🧰 Validando OPcache en CLI..."
+	@(docker compose exec -T php sh -lc "php -i | grep -E 'opcache.validate_timestamps|opcache.revalidate_freq|revalidate_path|file_update_protection|realpath_cache_ttl'" \
+	 || docker exec -i php-yes-ok-staging sh -lc "php -i | grep -E 'opcache.validate_timestamps|opcache.revalidate_freq|revalidate_path|file_update_protection|realpath_cache_ttl'")
+
+	@echo "🧹 Limpiando archivo temporal..."
+	@(docker compose exec -T php sh -lc 'rm -f /var/www/html/public/_checkop.php' \
+	 || docker exec -i php-yes-ok-staging sh -lc 'rm -f /var/www/html/public/_checkop.php')
+
+	@echo "\n✅ Listo. Si viste 'mtime=' y las directivas correctas, FPM y CLI están OK."
+pull-database-server:
+	@scp root@$(SERVER_IP):/home/yes-ok-staging-cupon/backend/storage/app/yes-ok-staging.sql storage/app/yes-ok-staging.sql
+pull-images-server:
+	@scp -r root@$(SERVER_IP):/home/yes-ok-staging-cupon/backend/public/images/ public/
+pull-logs-server:
+	@scp root@$(SERVER_IP):/home/yes-ok-staging-cupon/backend/storage/logs/laravel-2025-12-23.log storage/logs/laravel-2025-12-23.log
+          

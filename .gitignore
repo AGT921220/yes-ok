@@ -29,3 +29,5 @@ Homestead.json
 .env.production
 .phpactor.json
 auth.json
+mobile/google-services.json
+mobile/GoogleService-Info.plist

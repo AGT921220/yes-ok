@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "yes-ok",
+    "slug": "yes-ok",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FDFCF8"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.agsoftweb.yesok"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json",
+      "package": "com.agsoftweb.yesok"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

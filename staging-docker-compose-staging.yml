@@ -1,0 +1,104 @@
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx-yes-ok-staging
+    restart: always
+    ports:
+      - "${PORT_NGINX:-80}:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/logs:/var/log/nginx
+      - ./docker/nginx/${NGINX_CONF_FILE:-default.conf}:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+      - redis
+    networks:
+      - appnetwork
+
+  redis:
+    image: redis:latest
+    container_name: redis-yes-ok-staging
+    restart: always
+    ports:
+      - "${PORT_REDIS:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - appnetwork
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: fpm # Asegúrate de usar el target fpm
+    container_name: php-yes-ok-staging
+    restart: always
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+      REDIS_HOST: redis-yes-ok-staging # Forzamos el host para que no use 127.0.0.1
+    volumes:
+      - .:/var/www/html
+      # Quitamos el mapeo individual del .env porque ya entra con /var/www/html
+    networks:
+      - appnetwork
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  horizon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cli # Usamos el target cli
+    container_name: horizon-yes-ok-staging
+    restart: always
+    # IMPORTANTE: Ruta espejo a local
+    working_dir: /var/www/html
+    command: php artisan horizon
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      REDIS_HOST: redis-yes-ok-staging
+    volumes:
+      - .:/var/www/html
+    networks:
+      - appnetwork
+    depends_on:
+      php:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cli
+    container_name: scheduler-yes-ok-staging
+    restart: always
+    working_dir: /var/www/html
+    # En production mejor schedule:run en bucle para que no muera el proceso
+    command: sh -c "while [ true ]; do php artisan schedule:run --no-interaction & sleep 60; done"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      REDIS_HOST: redis-yes-ok-staging
+    volumes:
+      - .:/var/www/html
+    networks:
+      - appnetwork
+    depends_on:
+      php:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+
+networks:
+  appnetwork:
+    external: true
